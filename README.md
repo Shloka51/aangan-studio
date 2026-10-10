@@ -26,6 +26,12 @@ adapters/voice/vaani.ts ──► core/ (channel-agnostic) ──► adapters/ac
 
 The **brain is separate from the channel.** `core/` takes a normalized `Enquiry` and has no knowledge of telephony, Telegram or Supabase. To add WhatsApp or a web form later, you write one new adapter that produces `Enquiry` turns and calls `Session.onCallerTurn()` / `finalize()`. The Vaani adapter is about 100 lines and is the template for that.
 
+## Live deployment
+
+- Dashboard: https://aangan-studio-five.vercel.app (basic auth; password is `DASHBOARD_PASSWORD`)
+- Vaani webhook: `https://aangan-studio-five.vercel.app/api/voice/vaani` (HMAC-signed with `VAANI_WEBHOOK_SECRET`)
+- Every push to `main` auto-deploys (Vercel project `aangan-studio`, region `bom1`).
+
 ## Quick start (no keys needed)
 
 ```bash
