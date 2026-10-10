@@ -75,7 +75,7 @@ export class Session {
 
   private async say(action: AgentAction): Promise<string> {
     const s = this.state;
-    const notes = `${s.facts.projectType ?? "project"} in ${s.facts.location ?? "Pune"}`;
+    const notes = bookingNotes(s.facts);
     const bookingUrl = action.kind === "confirm_booking" ? this.deps.bookingLink({ name: s.facts.callerName, number: s.enquiry.caller.number, notes }) : undefined;
     let candidate: string;
     try {
@@ -149,7 +149,7 @@ export class Session {
           actions.push({ type: "schedule_followup", callerNumber: number, date: f.timeline.start, reason: `Caller open to starting after ${f.timeline.deadlineEvent ?? "their deadline"} — call to book` });
         break;
       case "QUALIFIED": {
-        const url = this.deps.bookingLink({ name: f.callerName, number, notes: `${f.projectType ?? "project"} in ${f.location ?? "Pune"}` });
+        const url = this.deps.bookingLink({ name: f.callerName, number, notes: bookingNotes(f) });
         actions.push({ type: "book_consultation", url, callerNumber: number });
         handoffNote = buildHandoffNote(e, f, q, outcome, s.transcript, url);
         actions.push({ type: "send_handoff", note: handoffNote, text: renderHandoffText(handoffNote) });
@@ -171,6 +171,14 @@ export class Session {
       afterHours: isAfterHours(e.receivedAt),
     };
   }
+}
+
+const PROJECT_WORDS = { full_home: "Full home", partial: "Partial home", single_room: "Single room", office: "Office" } as const;
+
+/** Short human note prefilled into the booking form, e.g. "Full home, 3BHK in Kothrud". */
+export function bookingNotes(f: Facts): string {
+  const what = [f.projectType ? PROJECT_WORDS[f.projectType] : "Interior project", f.property].filter(Boolean).join(", ");
+  return `${what} in ${f.location ?? "Pune"}`;
 }
 
 export function nextBusinessOpen(from: Date): Date {

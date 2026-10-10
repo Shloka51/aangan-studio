@@ -49,7 +49,7 @@ export function buildHandoffNote(e: Enquiry, f: Facts, q: Qualification, o: Outc
     approxSizeSqft: f.sqft ? `${f.sqft.toLocaleString("en-IN")} sq ft` : "Not given",
     scopeSummary: scope || "Not detailed on the call",
     timeline: timelineParts.join("; ") || "Not given",
-    leadTimeCheck: `${c3.status}: ${c3.reason}`,
+    leadTimeCheck: c3.status === "PASS" ? "PASS — realistic" : `${c3.status}: ${c3.reason}`,
     decisionMaker: `${f.decisionMaker.status === "self" ? "Present" : f.decisionMaker.status === "represented" ? "Represented" : "Unclear"} — ${f.decisionMaker.note ?? "not discussed"}`,
     budgetNote: f.budget ? `Caller volunteered a budget (${q.criteria.find((c) => c.id === 4)!.reason})` : undefined,
     qualification: q.verdict === "QUALIFIED" ? "QUALIFIED" : "UNCERTAIN",
@@ -70,12 +70,18 @@ export function assertNoPricing(note: HandoffNote): void {
   if (problems.length) throw new Error(`Handoff note contains pricing: ${problems.join(", ")}`);
 }
 
+/** "+91 98220 10101" → "+919822010101", which Telegram and mail apps make tap-to-call. */
+export function dialable(number: string): string {
+  return /^\+?[\d\s-]{8,}$/.test(number) ? number.replace(/[\s-]/g, "") : number;
+}
+
 export function renderHandoffText(n: HandoffNote): string {
   const lines = [
     `🏠 NEW ${n.qualification} LEAD — Aangan Studio`,
     n.priority ? `⚠️ ${n.priority}` : undefined,
     ``,
-    `Caller: ${n.callerName} · ${n.callerNumber}`,
+    `Caller: ${n.callerName}`,
+    `Call: ${dialable(n.callerNumber)}`,
     `Channel: ${n.channel} · ${n.timestamp}`,
     `Project: ${n.projectType}`,
     `Location: ${n.location} — in service area: ${n.inServiceArea}`,
