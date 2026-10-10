@@ -106,7 +106,7 @@ describe("transports (fetch mocked)", () => {
 
   it("Cal.com link is prefilled", () => {
     expect(calcomLink({ name: "Ritu Kapoor", number: "+91 98", notes: "full_home in Pimple Saudagar" }, "https://cal.com/aangan/consult")).toBe(
-      "https://cal.com/aangan/consult?name=Ritu+Kapoor&phone=%2B91+98&notes=full_home+in+Pimple+Saudagar",
+      "https://cal.com/aangan/consult?name=Ritu+Kapoor&attendeePhoneNumber=%2B9198&notes=full_home+in+Pimple+Saudagar",
     );
   });
 });

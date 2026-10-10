@@ -94,7 +94,7 @@ Judgement calls I made where the files leave room:
 3. **Supabase.** Create a project, then run `supabase/migrations/0001_init.sql` in the SQL editor. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (server-only; RLS is on with no policies).
 4. **Telegram.** Create a bot with @BotFather and set `TELEGRAM_BOT_TOKEN`. Add the bot to the designers' group and set `TELEGRAM_DESIGNER_CHAT_ID`. Optionally set `TELEGRAM_STUDIO_HEAD_CHAT_ID` for escalations; otherwise escalations go to the designer chat.
 5. **Resend.** Set `RESEND_API_KEY`, `HANDOFF_EMAIL_TO` and `STUDIO_HEAD_EMAIL`. You need a verified sending domain for `HANDOFF_EMAIL_FROM`; otherwise Resend only delivers to your own address.
-6. **Cal.com.** Set `CALCOM_BOOKING_URL` to the consultation event page. Links are prefilled with name, phone and notes. Add a "phone" booking question in Cal.com so the phone value is kept.
+6. **Cal.com.** Set `CALCOM_BOOKING_URL` to the consultation event page. Links are prefilled with name, phone and notes. On the event's **Booking form**, set Confirmation to **Phone**. This makes the built-in `attendeePhoneNumber` question required, and links prefill it.
 7. **Vaani.** Point the agent's webhook at `https://<deploy>/api/voice/vaani` and set `VAANI_WEBHOOK_SECRET`. In production, unsigned requests are rejected.
 8. **Dashboard.** Set `DASHBOARD_PASSWORD`; the page is behind basic auth. In production it refuses to serve without a password.
 9. **Deploy.** Push to GitHub and import the repo in Vercel. Every push to `main` auto-deploys. `vercel.json` pins the functions to Mumbai (`bom1`) for latency.
