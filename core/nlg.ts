@@ -126,6 +126,10 @@ export function renderTemplate({ action: a, facts: f, bookingUrl }: NLGInput): s
           ? "Phir bhi — ek room redesign execution ke saath kam se kam 8–10 hafte leta hai. Hum ise rush nahi karna chahenge."
           : "Even so — a room redesign with execution takes at least 8–10 weeks from start to finish. We wouldn't want to rush it.";
       }
+      if (a.declineReason === "budget_mismatch") // T10: "Even for one room."
+        return hi
+          ? "Ek room ke liye bhi, maaf kijiye — main abhi seedha bata dena behtar samajhti hoon. Jab bhi aapka plan badle, humein zaroor call kijiye."
+          : "Even for one room, I'm afraid — I'd rather be straight with you now than at the consultation. Do call us if your plans change; we'd be glad to help.";
       if (a.declineReason)
         return hi
           ? "Bilkul samajh sakti hoon. Jab bhi aapka plan badle, humein zaroor call kijiye."

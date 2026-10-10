@@ -116,7 +116,7 @@ function parseInr(num: string, unit: string): number {
   return n;
 }
 
-function extractBudget(text: string): Facts["budget"] {
+export function extractBudget(text: string): Facts["budget"] {
   const re = /(?:₹|rs\.?\s*|inr\s*)?(\d+(?:[.,]\d+)?)\s*(?:(?:to|-|–|se)\s*(?:₹|rs\.?\s*)?(\d+(?:[.,]\d+)?)\s*)?(lakhs?|lacs?|crores?|cr|k|thousand|hazaar)\b/i;
   const m = text.match(re);
   if (!m || !/budget|afford|spend|max|maximum|lakh|lac|crore|kharcha/i.test(text)) return undefined;

@@ -72,7 +72,11 @@ Each command:
 
 ### Results on the September transcripts (rules brain)
 
-21 of 21 calls match the brief's labels (T17 counts as two calls). T02 and T13 get the exact deflection on both of their pricing questions, and both still book. Run `npm run harness -- --all`, or `npm run eval:live` to run the same set through Gemini (needs a key, costs a few paise).
+21 of 21 calls match the brief's labels (T17 counts as two calls). T02 and T13 get the exact deflection on both of their pricing questions, and both still book. Run `npm run harness -- --all`, or `npm run eval:live` to run the same set through Gemini.
+
+**With Gemini (`gemini-3.5-flash-lite`, run on 10 Oct 2026):** 21 of 21 match, with 0 model fallbacks and 0 prices reaching a caller. Each call cost about ₹0.38, at about 2.7 s per caller turn (extract + reply). Prices are from third-party listings ($0.30 / $2.50 per 1M tokens); confirm them on Google's pricing page.
+
+A volunteered budget ("my budget is X, is that possible?") is treated as a budget-sanity turn (qualified.md §4), not a pricing question. The agent addresses it without echoing the figure, and the guardrail still blocks any number.
 
 Judgement calls I made where the files leave room:
 - **Minimum completion window = 10 weeks.** This comes from qualified.md ("8–10 weeks") and T07's front desk. Diwali 2026 is 8 November, about 9 weeks after T07's 8 September call, so T07 fails on timeline and is offered a November start plus a scheduled follow-up.
@@ -86,7 +90,7 @@ Judgement calls I made where the files leave room:
 ## Live setup
 
 1. **Env.** Copy `.env.example` to `.env.local`, or to Vercel project env vars. Everything below is optional; each missing piece degrades to a stub.
-2. **Gemini.** Set `GEMINI_API_KEY`. The default model is `gemini-2.5-flash`. The ₹ cost uses `GEMINI_USD_PER_M_INPUT/OUTPUT` and `USD_TO_INR`, so check current pricing. Each caller turn makes 2 small calls (extract + word), with a 6-second timeout that falls back to the rules brain.
+2. **Gemini.** Set `GEMINI_API_KEY`. The default model is `gemini-3.5-flash-lite`: about 1 s per call with no hidden "thinking". `gemini-3.8-flash` measured about 4 s per call, which is too slow for a phone turn. `gemini-2.5-*` is closed to new accounts. The ₹ cost uses `GEMINI_USD_PER_M_INPUT/OUTPUT` and `USD_TO_INR`, so check current pricing. Each caller turn makes 2 small calls (extract + word), with a 4-second timeout that falls back to the rules brain.
 3. **Supabase.** Create a project, then run `supabase/migrations/0001_init.sql` in the SQL editor. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (server-only; RLS is on with no policies).
 4. **Telegram.** Create a bot with @BotFather and set `TELEGRAM_BOT_TOKEN`. Add the bot to the designers' group and set `TELEGRAM_DESIGNER_CHAT_ID`. Optionally set `TELEGRAM_STUDIO_HEAD_CHAT_ID` for escalations; otherwise escalations go to the designer chat.
 5. **Resend.** Set `RESEND_API_KEY`, `HANDOFF_EMAIL_TO` and `STUDIO_HEAD_EMAIL`. You need a verified sending domain for `HANDOFF_EMAIL_FROM`; otherwise Resend only delivers to your own address.

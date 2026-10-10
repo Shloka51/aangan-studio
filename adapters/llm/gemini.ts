@@ -5,12 +5,12 @@
 // Any model error or timeout falls back to rules/templates, so a call never stalls.
 import { GoogleGenerativeAI, SchemaType, type ResponseSchema } from "@google/generative-ai";
 import { renderTemplate, type NLG, type NLGInput } from "@/core/nlg";
-import { extractFactsByRules, extractLocation, type NLU, type NLUInput } from "@/core/nlu";
+import { extractBudget, extractFactsByRules, extractLocation, type NLU, type NLUInput } from "@/core/nlu";
 import { buildSystemPrompt } from "@/core/prompt";
 import type { Brain } from "@/core/session";
-import type { Facts, ProjectType, UsageRecord } from "@/core/types";
+import type { Facts, ProjectType, Turn, UsageRecord } from "@/core/types";
 
-const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS ?? 6000);
+const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS ?? 4000);
 
 export function costInr(inputTokens: number, outputTokens: number): number {
   const inUsd = Number(process.env.GEMINI_USD_PER_M_INPUT ?? 0.3);
@@ -28,7 +28,7 @@ function client() {
   if (!key) throw new Error("GEMINI_API_KEY is not set");
   return new GoogleGenerativeAI(key);
 }
-const modelName = () => process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const modelName = () => process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
 const S = SchemaType;
 const str = (description: string) => ({ type: S.STRING, description, nullable: true });
@@ -60,7 +60,7 @@ const EXTRACTION_SCHEMA = {
     decisionMakerNote: str("One short line on who decides"),
     budgetRaw: str("Budget figure ONLY if the caller volunteered one, verbatim"),
     budgetMaxInr: { type: S.NUMBER, nullable: true, description: "Upper end of the volunteered budget in rupees" },
-    pricingAskedInLatestTurn: bool("The caller's LATEST turn asks about cost/price/rates/ballpark"),
+    pricingAskedInLatestTurn: bool("The caller's LATEST turn asks the studio for a cost/price/rate/range/ballpark. false when the caller states their OWN budget figure and asks whether it is enough"),
     existingProjectComplaint: bool("Caller is an existing client complaining about their ongoing project"),
     priorFollowUpFailure: bool("Caller enquired before and nobody got back to them"),
     reconnect: bool("Caller says their previous call just got cut off"),
@@ -84,7 +84,7 @@ export class GeminiNLU implements NLU {
       const res = await withTimeout(model.generateContent(`Today is ${input.now.toISOString().slice(0, 10)}.\n\nConversation so far:\n${convo}`));
       const x = JSON.parse(res.response.text()) as Extraction;
       const u = res.response.usageMetadata;
-      return { facts: mergeFacts(rules, x), usage: usageRecord("nlu", u?.promptTokenCount ?? 0, u?.candidatesTokenCount ?? 0) };
+      return { facts: mergeFacts(rules, x, input.transcript), usage: usageRecord("nlu", u?.promptTokenCount ?? 0, outputTokens(u)) };
     } catch (err) {
       console.warn("[gemini nlu] falling back to rules:", (err as Error).message);
       return { facts: rules };
@@ -93,7 +93,7 @@ export class GeminiNLU implements NLU {
 }
 
 /** Model facts override rules where present; safety-relevant intents are OR-ed. */
-export function mergeFacts(rules: Facts, x: Extraction): Facts {
+export function mergeFacts(rules: Facts, x: Extraction, transcript: Turn[] = []): Facts {
   const f: Facts = structuredClone(rules);
   const s = (k: string) => (typeof x[k] === "string" && x[k] ? (x[k] as string) : undefined);
   const b = (k: string) => (typeof x[k] === "boolean" ? (x[k] as boolean) : undefined);
@@ -127,8 +127,12 @@ export function mergeFacts(rules: Facts, x: Extraction): Facts {
   const dm = s("decisionMaker") as Facts["decisionMaker"]["status"] | undefined;
   if (dm) f.decisionMaker = { status: dm, note: s("decisionMakerNote") ?? f.decisionMaker.note };
   if (s("budgetRaw") || typeof x.budgetMaxInr === "number") f.budget = { raw: s("budgetRaw") ?? f.budget?.raw ?? "", maxInr: (x.budgetMaxInr as number) ?? f.budget?.maxInr };
+  // A turn where the caller volunteers their own budget is a budget-sanity turn
+  // (qualified.md §4: address it), not a request for our prices.
+  const latestCaller = [...transcript].reverse().find((t) => t.speaker === "caller")?.text ?? "";
+  const volunteersBudget = !!extractBudget(latestCaller);
   f.intents = {
-    pricingAsked: rules.intents.pricingAsked || !!b("pricingAskedInLatestTurn"),
+    pricingAsked: rules.intents.pricingAsked || (!volunteersBudget && !!b("pricingAskedInLatestTurn")),
     complaint: rules.intents.complaint || !!b("existingProjectComplaint"),
     priorFollowUpFailure: rules.intents.priorFollowUpFailure || !!b("priorFollowUpFailure"),
     reconnect: rules.intents.reconnect || !!b("reconnect"),
@@ -152,8 +156,13 @@ Studio-approved reference wording for this action (keep its meaning and any comm
 Write only the receptionist's next spoken reply.`;
     const res = await withTimeout(model.generateContent(prompt));
     const u = res.response.usageMetadata;
-    return { text: res.response.text().trim().replace(/^"|"$/g, ""), usage: usageRecord("nlg", u?.promptTokenCount ?? 0, u?.candidatesTokenCount ?? 0) };
+    return { text: res.response.text().trim().replace(/^"|"$/g, ""), usage: usageRecord("nlg", u?.promptTokenCount ?? 0, outputTokens(u)) };
   }
+}
+
+/** Output tokens billed, including hidden "thinking" tokens on newer models. */
+function outputTokens(u: { candidatesTokenCount?: number; thoughtsTokenCount?: number } | undefined): number {
+  return (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0);
 }
 
 function usageRecord(purpose: "nlu" | "nlg", inputTokens: number, outputTokens: number): UsageRecord {
