@@ -28,7 +28,28 @@ function client() {
   if (!key) throw new Error("GEMINI_API_KEY is not set");
   return new GoogleGenerativeAI(key);
 }
-const modelName = () => process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const DEFAULT_MODEL = "gemini-3.5-flash-lite";
+let retired = new Set<string>();
+const modelName = () => {
+  const m = (process.env.GEMINI_MODEL || DEFAULT_MODEL).trim();
+  return retired.has(m) ? DEFAULT_MODEL : m;
+};
+
+/** Runs a model call; if Google says the configured model is retired, retries once on the default. */
+async function withModelFallback<T>(call: (model: string) => Promise<T>): Promise<T> {
+  const model = modelName();
+  try {
+    return await call(model);
+  } catch (err) {
+    const msg = (err as Error).message;
+    if (model !== DEFAULT_MODEL && /no longer available|not found for API version|models\/[\w.-]+ is not found/i.test(msg)) {
+      console.warn(`[gemini] ${model} unavailable, using ${DEFAULT_MODEL}`);
+      retired = new Set([...retired, model]);
+      return call(DEFAULT_MODEL);
+    }
+    throw err;
+  }
+}
 
 const S = SchemaType;
 const str = (description: string) => ({ type: S.STRING, description, nullable: true });
@@ -75,13 +96,15 @@ export class GeminiNLU implements NLU {
   async extract(input: NLUInput): Promise<{ facts: Facts; usage?: UsageRecord }> {
     const rules = extractFactsByRules(input.transcript, input.now, input.known);
     try {
-      const model = client().getGenerativeModel({
-        model: modelName(),
+      const convo = input.transcript.map((t) => `${t.speaker === "agent" ? "Agent" : "Caller"}: ${t.text}`).join("\n");
+      const res = await withModelFallback((name) => {
+        const model = client().getGenerativeModel({
+        model: name,
         systemInstruction: "You extract structured facts from a phone enquiry to an interior-design studio in Pune. Only use what the caller actually said. Use null when unknown. Never invent figures.",
         generationConfig: { responseMimeType: "application/json", responseSchema: EXTRACTION_SCHEMA, temperature: 0 },
+        });
+        return withTimeout(model.generateContent(`Today is ${input.now.toISOString().slice(0, 10)}.\n\nConversation so far:\n${convo}`));
       });
-      const convo = input.transcript.map((t) => `${t.speaker === "agent" ? "Agent" : "Caller"}: ${t.text}`).join("\n");
-      const res = await withTimeout(model.generateContent(`Today is ${input.now.toISOString().slice(0, 10)}.\n\nConversation so far:\n${convo}`));
       const x = JSON.parse(res.response.text()) as Extraction;
       const u = res.response.usageMetadata;
       return { facts: mergeFacts(rules, x, input.transcript), usage: usageRecord("nlu", u?.promptTokenCount ?? 0, outputTokens(u)) };
@@ -145,7 +168,7 @@ export class GeminiNLG implements NLG {
   private system = buildSystemPrompt();
   async render(input: NLGInput): Promise<{ text: string; usage?: UsageRecord }> {
     const reference = renderTemplate(input);
-    const model = client().getGenerativeModel({ model: modelName(), systemInstruction: this.system, generationConfig: { temperature: 0.4, maxOutputTokens: 200 } });
+    const system = this.system;
     const f = input.facts;
     const prompt = `NEXT_ACTION: ${input.action.kind}${input.action.declineReason ? ` (reason: ${input.action.declineReason})` : ""}
 Caller language: ${f.language}
@@ -154,7 +177,9 @@ Studio-approved reference wording for this action (keep its meaning and any comm
 "${reference}"
 
 Write only the receptionist's next spoken reply.`;
-    const res = await withTimeout(model.generateContent(prompt));
+    const res = await withModelFallback((name) =>
+      withTimeout(client().getGenerativeModel({ model: name, systemInstruction: system, generationConfig: { temperature: 0.4, maxOutputTokens: 200 } }).generateContent(prompt)),
+    );
     const u = res.response.usageMetadata;
     return { text: res.response.text().trim().replace(/^"|"$/g, ""), usage: usageRecord("nlg", u?.promptTokenCount ?? 0, outputTokens(u)) };
   }
