@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aangan Studio — Components Map</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --ink: #1d1b18; --muted: #6b6760; --line: #8a857c;
+    --core: #2a5d9f; --core-bg: #eef4fb;
+    --live: #1e7a4f; --live-bg: #eaf6ef;
+    --built: #a36a00; --built-bg: #fff5e0;
+    --guard: #b3261e; --guard-bg: #fdecea;
+    --box: #ffffff; --border: #d9d4ca;
+  }
+  html, body { margin: 0; background: var(--bg); }
+  body { font: 15px/1.35 "Helvetica Neue", Arial, sans-serif; color: var(--ink); }
+  svg text { font-family: "Helvetica Neue", Arial, sans-serif; fill: var(--ink); }
+  .t { font-size: 15px; font-weight: 700; }
+  .s { font-size: 12.5px; fill: var(--muted); }
+  .xs { font-size: 11.5px; fill: var(--muted); }
+  .lbl { font-size: 12px; fill: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a857c"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b3261e"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="40" y="52" style="font-size:28px;font-weight:800">Aangan Studio — Voice AI enquiry agent: components map</text>
+  <text x="40" y="80" class="s">Inbound phone enquiries 24/7 → qualify on the 5 criteria → book / decline / escalate / call back. Brain is channel-agnostic; channels are swappable adapters.</text>
+
+  <!-- Legend -->
+  <g transform="translate(1290,30)">
+    <rect x="0" y="0" width="470" height="62" rx="10" fill="#fff" stroke="#d9d4ca"/>
+    <rect x="16" y="14" width="16" height="16" rx="4" fill="#eaf6ef" stroke="#1e7a4f" stroke-width="2"/><text x="40" y="27" class="xs">Live</text>
+    <rect x="90" y="14" width="16" height="16" rx="4" fill="#fff5e0" stroke="#a36a00" stroke-width="2"/><text x="114" y="27" class="xs">Built + tested, not yet connected</text>
+    <rect x="320" y="14" width="16" height="16" rx="4" fill="#fff" stroke="#8a857c" stroke-width="2" stroke-dasharray="4 3"/><text x="344" y="27" class="xs">Future adapter</text>
+    <rect x="16" y="38" width="16" height="16" rx="4" fill="#eef4fb" stroke="#2a5d9f" stroke-width="2"/><text x="40" y="51" class="xs">Core (no telephony / vendor code)</text>
+    <rect x="250" y="38" width="16" height="16" rx="4" fill="#fdecea" stroke="#b3261e" stroke-width="2"/><text x="274" y="51" class="xs">Hard pricing guardrail</text>
+  </g>
+
+  <!-- ===== Channels (left) ===== -->
+  <text x="40" y="132" class="t" style="fill:#6b6760;letter-spacing:.08em">CHANNELS</text>
+
+  <rect x="40" y="150" width="230" height="78" rx="12" fill="#fff" stroke="#d9d4ca" stroke-width="1.5"/>
+  <text x="58" y="180" class="t">📞 Caller</text>
+  <text x="58" y="202" class="s">English / Hindi / Hinglish</text>
+  <text x="58" y="220" class="s">any hour (after-hours tracked)</text>
+
+  <rect x="40" y="262" width="230" height="118" rx="12" fill="#fff5e0" stroke="#a36a00" stroke-width="2"/>
+  <text x="58" y="292" class="t">Vaani (vaanivoice.ai)</text>
+  <text x="58" y="314" class="s">Telephony + speech-to-text</text>
+  <text x="58" y="332" class="s">+ text-to-speech (hi / en)</text>
+  <text x="58" y="350" class="s">agent "aangan-enquiries",</text>
+  <text x="58" y="368" class="s">BYOL brain, no LLM fallback</text>
+
+  <rect x="40" y="420" width="230" height="60" rx="12" fill="#fff" stroke="#8a857c" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <text x="58" y="446" class="t">WhatsApp adapter</text>
+  <text x="58" y="466" class="s">same Enquiry → core</text>
+  <rect x="40" y="494" width="230" height="60" rx="12" fill="#fff" stroke="#8a857c" stroke-width="1.6" stroke-dasharray="6 4"/>
+  <text x="58" y="520" class="t">Web-form adapter</text>
+  <text x="58" y="540" class="s">same Enquiry → core</text>
+
+  <!-- caller -> vaani -->
+  <line x1="155" y1="228" x2="155" y2="260" stroke="#8a857c" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- ===== Voice adapters (middle-left) ===== -->
+  <text x="330" y="132" class="t" style="fill:#6b6760;letter-spacing:.08em">VOICE ADAPTER</text>
+
+  <rect x="330" y="150" width="300" height="130" rx="12" fill="#fff5e0" stroke="#a36a00" stroke-width="2"/>
+  <text x="348" y="180" class="t">Call server  ·  server/vaani-ws.ts</text>
+  <text x="348" y="202" class="s">Vaani BYOL WebSocket, one per call</text>
+  <text x="348" y="220" class="s">response_required → core → reply</text>
+  <text x="348" y="238" class="s">bearer-token auth · always-on host</text>
+  <text x="348" y="256" class="s">(Mac + tunnel for testing; Dockerfile</text>
+  <text x="348" y="272" class="s">for Fly.io Mumbai in production)</text>
+
+  <rect x="330" y="306" width="300" height="104" rx="12" fill="#eaf6ef" stroke="#1e7a4f" stroke-width="2"/>
+  <text x="348" y="336" class="t">Call-event webhook  ·  Vercel</text>
+  <text x="348" y="358" class="s">/api/voice/vaani?token=…</text>
+  <text x="348" y="376" class="s">call_started → caller number</text>
+  <text x="348" y="394" class="s">postprocessing → missed-call safety net</text>
+
+  <path d="M270,300 C300,300 300,215 328,215" fill="none" stroke="#8a857c" stroke-width="2" marker-end="url(#a)"/>
+  <text x="276" y="252" class="lbl">WS</text>
+  <path d="M270,345 L328,355" fill="none" stroke="#8a857c" stroke-width="2" marker-end="url(#a)"/>
+  <text x="282" y="380" class="lbl">HTTP</text>
+
+  <rect x="330" y="436" width="300" height="118" rx="12" fill="#eaf6ef" stroke="#1e7a4f" stroke-width="2"/>
+  <text x="348" y="466" class="t">Text harness + tests</text>
+  <text x="348" y="488" class="s">cli/harness.ts · cli/chat.ts</text>
+  <text x="348" y="506" class="s">T01–T20 labelled set, 96 tests</text>
+  <text x="348" y="524" class="s">fake-Vaani client over real WebSocket</text>
+  <text x="348" y="542" class="s">zero telephony / paid APIs</text>
+
+  <!-- ===== CORE (center) ===== -->
+  <rect x="680" y="118" width="560" height="560" rx="16" fill="#eef4fb" stroke="#2a5d9f" stroke-width="2.5"/>
+  <text x="704" y="150" class="t" style="font-size:18px;fill:#2a5d9f">core/ — channel-agnostic brain</text>
+  <text x="704" y="172" class="s">Input: normalized Enquiry (caller, channel, time, turns). Runs per turn.</text>
+
+  <!-- pipeline steps -->
+  <g>
+    <rect x="704" y="190" width="512" height="44" rx="8" fill="#fff" stroke="#2a5d9f" stroke-width="1.4"/>
+    <text x="720" y="217" class="t" style="font-size:14px">1  Load context</text><text x="880" y="217" class="s">knowledge/ parsed: service area, deflection, rubric</text>
+
+    <rect x="704" y="244" width="512" height="44" rx="8" fill="#fff" stroke="#2a5d9f" stroke-width="1.4"/>
+    <text x="720" y="271" class="t" style="font-size:14px">2  Understand (NLU)</text><text x="880" y="271" class="s">Gemini 3.5 Flash-Lite JSON extraction ∪ regex rules</text>
+
+    <rect x="704" y="298" width="512" height="44" rx="8" fill="#fff" stroke="#2a5d9f" stroke-width="1.4"/>
+    <text x="720" y="325" class="t" style="font-size:14px">3  Qualify (5 criteria)</text><text x="880" y="325" class="s">project · area · timeline · budget · decision-maker</text>
+
+    <rect x="704" y="352" width="512" height="44" rx="8" fill="#fff" stroke="#2a5d9f" stroke-width="1.4"/>
+    <text x="720" y="379" class="t" style="font-size:14px">4  Policy decides</text><text x="880" y="379" class="s">ask 1 question / deflect / book / decline / escalate</text>
+
+    <rect x="704" y="406" width="512" height="44" rx="8" fill="#fff" stroke="#2a5d9f" stroke-width="1.4"/>
+    <text x="720" y="433" class="t" style="font-size:14px">5  Word the reply (NLG)</text><text x="880" y="433" class="s">Gemini under composed prompt | studio templates</text>
+
+    <rect x="704" y="460" width="512" height="54" rx="8" fill="#fdecea" stroke="#b3261e" stroke-width="2.2"/>
+    <text x="720" y="484" class="t" style="font-size:14px;fill:#b3261e">6  PRICING GUARDRAIL (hard code check)</text>
+    <text x="720" y="503" class="s">price question → exact pricing.md deflection · ₹/lakh/per-sq-ft/ranges blocked</text>
+
+    <rect x="704" y="524" width="512" height="44" rx="8" fill="#fff" stroke="#2a5d9f" stroke-width="1.4"/>
+    <text x="720" y="551" class="t" style="font-size:14px">7  Classify outcome</text><text x="880" y="551" class="s">QUALIFIED · DECLINED · ESCALATED · CALLBACK</text>
+
+    <rect x="704" y="578" width="512" height="44" rx="8" fill="#fff" stroke="#2a5d9f" stroke-width="1.4"/>
+    <text x="720" y="605" class="t" style="font-size:14px">8  Handoff note</text><text x="880" y="605" class="s">schema fields + transcript · scanned: no pricing</text>
+
+    <rect x="704" y="632" width="512" height="34" rx="8" fill="#fff" stroke="#2a5d9f" stroke-width="1.4"/>
+    <text x="720" y="654" class="t" style="font-size:14px">9  Emit actions</text><text x="880" y="654" class="s">book · handoff · escalate · queue/resolve callback</text>
+  </g>
+  <!-- step arrows -->
+  <g stroke="#2a5d9f" stroke-width="1.6">
+    <line x1="960" y1="234" x2="960" y2="243"/><line x1="960" y1="288" x2="960" y2="297"/><line x1="960" y1="342" x2="960" y2="351"/>
+    <line x1="960" y1="396" x2="960" y2="405"/><line x1="960" y1="450" x2="960" y2="459"/><line x1="960" y1="514" x2="960" y2="523"/>
+    <line x1="960" y1="568" x2="960" y2="577"/><line x1="960" y1="622" x2="960" y2="631"/>
+  </g>
+
+  <!-- adapters -> core -->
+  <line x1="630" y1="215" x2="678" y2="215" stroke="#8a857c" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="630" y1="358" x2="678" y2="358" stroke="#8a857c" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="630" y1="495" x2="678" y2="495" stroke="#8a857c" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M270,540 C320,630 560,640 678,640" fill="none" stroke="#8a857c" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a)"/>
+  <!-- reply back to Vaani -->
+  <path d="M702,487 L656,487 L656,262 L634,262" fill="none" stroke="#b3261e" stroke-width="2" marker-end="url(#ar)"/>
+  <text transform="translate(671,348) rotate(-90)" class="lbl" style="fill:#b3261e;font-size:11px">guardrailed reply</text>
+
+  <!-- ===== Knowledge (bottom of core) ===== -->
+  <rect x="680" y="706" width="560" height="120" rx="12" fill="#fff" stroke="#d9d4ca" stroke-width="1.5"/>
+  <text x="700" y="734" class="t">knowledge/  (source of truth)</text>
+  <text x="700" y="756" class="s">services.md → service area, scope, timelines (into prompt)</text>
+  <text x="700" y="774" class="s">qualified.md → 5 criteria + boundary rules (into prompt, ₹ redacted)</text>
+  <text x="700" y="792" class="s">pricing.md → INTERNAL ONLY: deflection text, guardrail blocklist,</text>
+  <text x="700" y="810" class="s">budget-sanity floors — never sent to the model or a caller</text>
+  <line x1="960" y1="704" x2="960" y2="680" stroke="#8a857c" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- ===== Actions / integrations (right) ===== -->
+  <text x="1290" y="132" class="t" style="fill:#6b6760;letter-spacing:.08em">ACTIONS &amp; INTEGRATIONS</text>
+  <rect x="1290" y="150" width="470" height="60" rx="12" fill="#fff" stroke="#d9d4ca" stroke-width="1.5"/>
+  <text x="1308" y="177" class="t">adapters/actions.ts — executor</text>
+  <text x="1308" y="197" class="s">runs emitted actions, records every send in the store</text>
+  <line x1="1240" y1="649" x2="1270" y2="649" stroke="#8a857c" stroke-width="2"/>
+  <path d="M1270,649 L1270,180 L1288,180" fill="none" stroke="#8a857c" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="1310" y="232" width="450" height="84" rx="12" fill="#eaf6ef" stroke="#1e7a4f" stroke-width="2"/>
+  <text x="1328" y="260" class="t">Telegram Bot — @aangan_pune_leads_bot</text>
+  <text x="1328" y="282" class="s">"Aangan Leads" group: qualified-lead handoff notes,</text>
+  <text x="1328" y="300" class="s">escalations (T09), callback alerts (T08 / T17)</text>
+
+  <rect x="1310" y="330" width="450" height="64" rx="12" fill="#fff5e0" stroke="#a36a00" stroke-width="2"/>
+  <text x="1328" y="358" class="t">Resend email</text>
+  <text x="1328" y="380" class="s">same note by email · built, awaiting recipients</text>
+
+  <rect x="1310" y="408" width="450" height="84" rx="12" fill="#eaf6ef" stroke="#1e7a4f" stroke-width="2"/>
+  <text x="1328" y="436" class="t">Cal.com — consultation booking</text>
+  <text x="1328" y="458" class="s">prefilled link (name, attendeePhoneNumber, notes)</text>
+  <text x="1328" y="476" class="s">→ designer note + caller</text>
+
+  <rect x="1310" y="506" width="450" height="104" rx="12" fill="#eaf6ef" stroke="#1e7a4f" stroke-width="2"/>
+  <text x="1328" y="534" class="t">Supabase (Postgres)</text>
+  <text x="1328" y="556" class="s">enquiries · turns · qualifications · handoffs ·</text>
+  <text x="1328" y="574" class="s">bookings · callbacks · cost (tokens → ₹ per call)</text>
+  <text x="1328" y="592" class="s">RLS on, service-role only</text>
+
+  <g stroke="#8a857c" stroke-width="2" fill="none">
+    <path d="M1290,210 L1290,274 L1308,274" marker-end="url(#a)"/>
+    <path d="M1290,274 L1290,362 L1308,362" marker-end="url(#a)"/>
+    <path d="M1290,362 L1290,450 L1308,450" marker-end="url(#a)"/>
+    <path d="M1290,450 L1290,558 L1308,558" marker-end="url(#a)"/>
+  </g>
+  <!-- webhook + call server write to store -->
+
+  <rect x="1310" y="640" width="450" height="104" rx="12" fill="#eaf6ef" stroke="#1e7a4f" stroke-width="2"/>
+  <text x="1328" y="668" class="t">Dashboard — Next.js on Vercel (bom1)</text>
+  <text x="1328" y="690" class="s">enquiries · % answered &lt; 5 min · median response ·</text>
+  <text x="1328" y="708" class="s">qualification rate · consultations booked · outcomes ·</text>
+  <text x="1328" y="726" class="s">cost-to-run · office-hours vs after-hours split</text>
+  <line x1="1535" y1="612" x2="1535" y2="638" stroke="#8a857c" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="1310" y="758" width="450" height="68" rx="12" fill="#eaf6ef" stroke="#1e7a4f" stroke-width="2"/>
+  <text x="1328" y="786" class="t">GitHub → Vercel auto-deploy</text>
+  <text x="1328" y="808" class="s">push to main = new production deploy</text>
+
+  <!-- ===== Outcomes strip ===== -->
+  <text x="40" y="880" class="t" style="fill:#6b6760;letter-spacing:.08em">OUTCOMES — every call ends with a next step</text>
+  <g>
+    <rect x="40" y="896" width="420" height="96" rx="12" fill="#fff" stroke="#1e7a4f" stroke-width="2"/>
+    <text x="58" y="924" class="t" style="fill:#1e7a4f">QUALIFIED → book + handoff</text>
+    <text x="58" y="946" class="s">Cal.com link + note to designers (Telegram/email)</text>
+    <text x="58" y="964" class="s">UNCERTAIN criteria listed · T16 recovery: "handle with care"</text>
+    <text x="58" y="982" class="xs">T01 T02 T05 T06 T11 T12 T13 T14 T15 T16 T17b T20</text>
+
+    <rect x="480" y="896" width="420" height="96" rx="12" fill="#fff" stroke="#8a857c" stroke-width="2"/>
+    <text x="498" y="924" class="t">DECLINED → graceful, studio wording</text>
+    <text x="498" y="946" class="s">out of area · advice only · out of scope · below-min</text>
+    <text x="498" y="964" class="s">commercial · budget mismatch · impossible timeline</text>
+    <text x="498" y="982" class="xs">T03 T04 T07 (+ follow-up for Nov start) T10 T18 T19</text>
+
+    <rect x="920" y="896" width="420" height="96" rx="12" fill="#fff" stroke="#b3261e" stroke-width="2"/>
+    <text x="938" y="924" class="t" style="fill:#b3261e">ESCALATED → studio head</text>
+    <text x="938" y="946" class="s">existing-project complaint · Nikhil / senior person</text>
+    <text x="938" y="964" class="s">calls back within 15 minutes</text>
+    <text x="938" y="982" class="xs">T09</text>
+
+    <rect x="1360" y="896" width="400" height="96" rx="12" fill="#fff" stroke="#a36a00" stroke-width="2"/>
+    <text x="1378" y="924" class="t" style="fill:#a36a00">CALLBACK → queued</text>
+    <text x="1378" y="946" class="s">missed / dropped: number captured, due next</text>
+    <text x="1378" y="964" class="s">opening; ringing back auto-resolves it</text>
+    <text x="1378" y="982" class="xs">T08 T17a</text>
+  </g>
+
+  <text x="40" y="1040" class="s">Results: rules brain and Gemini both match all 21 labelled calls (T17 split in two); T02 / T13 receive the exact deflection on every price question and still book; 0 prices reach a caller, even with a deliberately leaky model.</text>
+  <text x="40" y="1062" class="s">Gemini cost ≈ ₹0.38 per enquiry · ≈ 2.7 s per reply. Paid steps not yet bought: a Vaani phone number (₹100 setup + ₹500–999/mo) and always-on call-server hosting (~$2–5/mo).</text>
+  <text x="40" y="1092" class="xs">github.com/Shloka51/aangan-studio · aangan-studio-five.vercel.app</text>
+</svg>
+</body>
+</html>
