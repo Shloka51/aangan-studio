@@ -64,17 +64,18 @@ export function renderTemplate({ action: a, facts: f, bookingUrl }: NLGInput): s
   const first = f.callerName?.split(" ")[0];
   const name = first ? (hi ? `, ${first} ji` : `, ${first}`) : "";
   const recovery = f.intents.priorFollowUpFailure;
+  const yes = a.afterBookingYes ? (hi ? "Zaroor, main book kar deti hoon — bas ek chhota sa sawaal: " : "Happy to book that — just one quick question first: ") : "";
   switch (a.kind) {
     case "greet":
       return hi ? "Namaste, Aangan Studio. Main aapki kaise madad kar sakti hoon?" : "Hello, Aangan Studio. How can I help you today?";
     case "ask_scope":
-      return hi
+      return yes + (hi
         ? "Aap design ke saath full execution chahte hain, ya sirf design advice?"
-        : "Are you looking for full design and execution, or design advice only?";
+        : "are you looking for full design and execution, or design advice only?").replace(/^are/, yes ? "are" : "Are");
     case "ask_location":
-      return hi ? "Site kis area mein hai?" : "Which area is the site in?";
+      return yes + (hi ? "Site kis area mein hai?" : yes ? "which area is the site in?" : "Which area is the site in?");
     case "ask_timeline":
-      return hi ? "Aapko project kab tak complete chahiye?" : "When would you need the project complete?";
+      return yes + (hi ? "Aapko project kab tak complete chahiye?" : yes ? "when would you need the project complete?" : "When would you need the project complete?");
     case "ask_name":
       return hi ? "Kya main aapka naam jaan sakti hoon?" : "Can I take your name, please?";
     case "deflect_pricing":

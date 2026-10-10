@@ -30,19 +30,22 @@ export function decideNext(f: Facts, q: Qualification, s: PolicyState): AgentAct
     return { kind: "decline", declineReason: q.declineReason };
   }
 
+  const offered = did("offer_booking") || did("deflect_pricing") || did("recover_apology");
+  const saidYes = offered && AFFIRM.test(s.lastCallerText);
+
   if (!f.intents.priorFollowUpFailure) {
     // Unclear on 1/2/3: one direct question each, never repeated.
     const c = (id: number) => q.criteria.find((x) => x.id === id)!.status === "UNCERTAIN";
-    if (c(1) && !did("ask_scope")) return { kind: "ask_scope" };
-    if (c(2) && !did("ask_location")) return { kind: "ask_location" };
-    if (c(3) && !did("ask_timeline")) return { kind: "ask_timeline" };
+    const ask = (kind: AgentActionKind): AgentAction => (saidYes ? { kind, afterBookingYes: true } : { kind });
+    if (c(1) && !did("ask_scope")) return ask("ask_scope");
+    if (c(2) && !did("ask_location")) return ask("ask_location");
+    if (c(3) && !did("ask_timeline")) return ask("ask_timeline");
   }
 
   // (a) Qualified (or uncertain only after asking): book.
   if (did("confirm_booking")) return { kind: "acknowledge" };
   // Recovery: we already let this caller down once — book directly, no extra questions.
   if (f.intents.priorFollowUpFailure && did("recover_apology")) return { kind: "confirm_booking" };
-  const offered = did("offer_booking") || did("deflect_pricing") || did("recover_apology");
-  if (offered && AFFIRM.test(s.lastCallerText)) return { kind: "confirm_booking" };
+  if (saidYes) return { kind: "confirm_booking" };
   return { kind: "offer_booking" };
 }

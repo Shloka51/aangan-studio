@@ -142,6 +142,8 @@ export type AgentActionKind =
 export interface AgentAction {
   kind: AgentActionKind;
   declineReason?: DeclineReason;
+  /** The caller just said yes to booking; acknowledge before the one remaining question. */
+  afterBookingYes?: boolean;
 }
 
 export interface HandoffNote {
