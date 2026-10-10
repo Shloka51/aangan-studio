@@ -29,3 +29,11 @@ describe("dashboard metrics", () => {
     expect(m.costInr).toBe(0); // rules brain makes no model calls
   });
 });
+
+describe("store config", async () => {
+  const { supabaseBaseUrl } = await import("@/store");
+  it("tolerates a pasted /rest/v1/ suffix", () => {
+    expect(supabaseBaseUrl("https://abc.supabase.co/rest/v1/")).toBe("https://abc.supabase.co");
+    expect(supabaseBaseUrl(" https://abc.supabase.co ")).toBe("https://abc.supabase.co");
+  });
+});

@@ -51,10 +51,16 @@ export interface Store {
   dashboardRows(sinceIso?: string): Promise<DashboardRow[]>;
 }
 
+/** Accepts the project URL with or without a pasted "/rest/v1/" suffix. */
+export function supabaseBaseUrl(raw: string): string {
+  const u = new URL(raw.trim());
+  return u.origin;
+}
+
 export async function getStore(): Promise<Store> {
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     const { SupabaseStore } = await import("./supabase");
-    return new SupabaseStore(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    return new SupabaseStore(supabaseBaseUrl(process.env.SUPABASE_URL), process.env.SUPABASE_SERVICE_ROLE_KEY.trim());
   }
   const { memoryStore } = await import("./memory");
   return memoryStore();
