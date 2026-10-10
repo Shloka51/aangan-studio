@@ -174,7 +174,10 @@ export class Session {
 }
 
 export function nextBusinessOpen(from: Date): Date {
-  const d = new Date(from);
+  if (!isAfterHours(from.toISOString())) return from;
+  // Align to a quarter hour (IST is UTC+5:30, so quarter hours line up) so we land on opening time.
+  const q = 15 * 60_000;
+  const d = new Date(Math.ceil(from.getTime() / q) * q);
   for (let i = 0; i < 4 * 24 * 8 && isAfterHours(d.toISOString()); i++) d.setTime(d.getTime() + 15 * 60_000);
   return d;
 }

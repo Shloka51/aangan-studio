@@ -68,7 +68,7 @@ export function extractTimeline(text: string, now: Date, answeringTimeline = fal
   }
 
   // Deadlines: "by March", "move in November", "operational by December", "before Diwali".
-  const deadlineCue = String.raw`(?:done by|ready by|complete(?:d)? by|finish(?:ed)? by|operational by|move (?:back )?in (?:by )?|moving in (?:by )?|by|before|until|till|tak)`;
+  const deadlineCue = String.raw`(?:done by|ready by|complete(?:d)? by|finish(?:ed)? by|operational by|move (?:back )?in(?: by)?|moving in(?: by)?|by|before|until|till|tak)`;
   const dm = t.match(new RegExp(String.raw`\b${deadlineCue}\s+(?:the\s+)?(?:end of\s+)?${MONTH_RE}\b(\s+next year|\s+20\d\d)?`, "i"));
   const de = t.match(new RegExp(String.raw`\b(?:by|before|for|in time for|se pehle|pehle)\s+${EVENT_RE}\b|\b${EVENT_RE}\s+(?:se pehle|tak|ke pehle)`, "i"));
   const dmPost = t.match(new RegExp(String.raw`\b${MONTH_RE}(\s+next year)?\s+(?:to move in|move[- ]in|tak)\b`, "i"));

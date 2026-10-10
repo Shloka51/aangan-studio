@@ -24,8 +24,9 @@ export function decideNext(f: Facts, q: Qualification, s: PolicyState): AgentAct
   // (b) Any hard fail: decline (or offer a later start for a timeline-only fail).
   if (q.failed.length) {
     const timelineOnly = q.declineReason === "impossible_timeline";
+    if (timelineOnly && did("offer_deferred_start")) return { kind: "acknowledge", declineReason: q.declineReason };
     if (timelineOnly && f.intents.deferAfterEvent) return { kind: "offer_deferred_start", declineReason: q.declineReason };
-    if (did("decline") || did("offer_deferred_start")) return { kind: "acknowledge", declineReason: q.declineReason };
+    if (did("decline")) return { kind: "acknowledge", declineReason: q.declineReason };
     return { kind: "decline", declineReason: q.declineReason };
   }
 
@@ -39,8 +40,9 @@ export function decideNext(f: Facts, q: Qualification, s: PolicyState): AgentAct
 
   // (a) Qualified (or uncertain only after asking): book.
   if (did("confirm_booking")) return { kind: "acknowledge" };
+  // Recovery: we already let this caller down once — book directly, no extra questions.
+  if (f.intents.priorFollowUpFailure && did("recover_apology")) return { kind: "confirm_booking" };
   const offered = did("offer_booking") || did("deflect_pricing") || did("recover_apology");
   if (offered && AFFIRM.test(s.lastCallerText)) return { kind: "confirm_booking" };
-  if (f.intents.priorFollowUpFailure && did("offer_booking")) return { kind: "confirm_booking" };
   return { kind: "offer_booking" };
 }

@@ -61,7 +61,7 @@ function escapeRe(s: string) {
 }
 
 /** Finds the caller's site location. Prefers places attached to "my/our ... in X". */
-function extractLocation(text: string): { location?: string; area: AreaStatus } {
+export function extractLocation(text: string): { location?: string; area: AreaStatus } {
   const candidates: { name: string; area: AreaStatus; idx: number; score: number }[] = [];
   const add = (names: string[], area: AreaStatus) => {
     for (const name of names) {

@@ -55,16 +55,16 @@ export function criterion3(f: Facts, { now }: QualifyContext): CriterionResult &
   const t = f.timeline;
   if (t.deadline) {
     const weeks = weeksBetween(now, new Date(t.deadline));
-    const label = t.deadlineEvent ?? t.deadlineRaw ?? t.deadline;
+    const label = t.deadlineEvent ?? t.deadlineRaw ?? new Date(t.deadline).toDateString();
     if (weeks < STUDIO.minLeadWeeks)
       return { ...result(3, "FAIL", `Needs completion by ${label} (~${Math.max(0, Math.round(weeks))} weeks) — under the ${STUDIO.minLeadWeeks}-week minimum lead time.`), decline: "impossible_timeline" };
     if (weeks < STUDIO.minCompletionWeeks)
       return { ...result(3, "FAIL", `Needs completion by ${label} (~${Math.round(weeks)} weeks) — design plus execution needs at least ${STUDIO.minCompletionWeeks}.`), decline: "impossible_timeline" };
   }
   if (t.siteAvailable && weeksBetween(now, new Date(t.siteAvailable)) > STUDIO.maxSiteWaitWeeks)
-    return result(3, "UNCERTAIN", `Site not available until ${t.siteAvailable}, beyond the ${STUDIO.maxSiteWaitWeeks}-week window.`);
+    return result(3, "UNCERTAIN", `Site not available until ${new Date(t.siteAvailable).toDateString()}, beyond the ${STUDIO.maxSiteWaitWeeks}-week window.`);
   if (t.urgent && !t.deadline) return result(3, "UNCERTAIN", "Caller sounds urgent but gave no completion date.");
-  if (t.deadline) return result(3, "PASS", `Completion by ${t.deadlineEvent ?? t.deadlineRaw ?? t.deadline}: ~${Math.round(weeksBetween(now, new Date(t.deadline)))} weeks away.`);
+  if (t.deadline) return result(3, "PASS", `Completion by ${t.deadlineEvent ?? t.deadlineRaw ?? new Date(t.deadline).toDateString()}: ~${Math.round(weeksBetween(now, new Date(t.deadline)))} weeks away.`);
   if (t.start || t.siteAvailable || t.noRush) return result(3, "PASS", `${t.startRaw ? `Start: ${t.startRaw}. ` : ""}${t.siteAvailable ? "Site available. " : ""}${t.noRush ? "No rush." : ""}`.trim());
   return result(3, "UNCERTAIN", "No completion date given.");
 }

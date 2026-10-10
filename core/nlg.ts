@@ -61,7 +61,9 @@ function declineText(f: Facts, a: AgentAction, lang: Language): string {
 
 export function renderTemplate({ action: a, facts: f, bookingUrl }: NLGInput): string {
   const hi = f.language === "hinglish";
-  const name = f.callerName ? (hi ? ` ${f.callerName} ji` : ` ${f.callerName}`) : "";
+  const first = f.callerName?.split(" ")[0];
+  const name = first ? (hi ? `, ${first} ji` : `, ${first}`) : "";
+  const recovery = f.intents.priorFollowUpFailure;
   switch (a.kind) {
     case "greet":
       return hi ? "Namaste, Aangan Studio. Main aapki kaise madad kar sakti hoon?" : "Hello, Aangan Studio. How can I help you today?";
@@ -86,6 +88,10 @@ export function renderTemplate({ action: a, facts: f, bookingUrl }: NLGInput): s
         ? `Ye hamare liye achha scope hai${name}. Kya main aapke liye designer ke saath free consultation book kar doon?${f.callerName ? "" : " Aapka naam bhi bata dijiye."}`
         : `That sounds like a good fit for us${name}. Shall I set up a free consultation with one of our designers?${f.callerName ? "" : " And may I have your name for the booking?"}`;
     case "confirm_booking":
+      if (recovery)
+        return hi
+          ? `Shukriya${name}, aur phir se maafi. Main abhi is number par booking link bhej rahi hoon, aur designer ko flag kar rahi hoon taaki woh aapko aaj hi call karein.`
+          : `Thank you${name} — and again, I'm sorry. I'm sending a booking link to this number right now, and flagging this so a designer calls you today.`;
       return hi
         ? `Perfect${name}. Main aapko is number par booking link bhej rahi hoon — usme apna convenient slot chun lijiye. Designer aapke project ki poori details ke saath taiyaar rahenge.`
         : `Perfect${name}. I'm sending a booking link to this number so you can pick a slot that suits you${bookingUrl ? "" : ""}. Your designer will have all the details we discussed.`;
@@ -106,6 +112,20 @@ export function renderTemplate({ action: a, facts: f, bookingUrl }: NLGInput): s
         return hi
           ? `Note kar liya. Nikhil ya koi senior person ${STUDIO.escalationCallbackMinutes} minute mein call karenge.`
           : `Noted — I'll make sure of that. Nikhil or a senior person will call you back within ${STUDIO.escalationCallbackMinutes} minutes.`;
+      if (recovery && !a.declineReason)
+        return hi
+          ? "Aap bilkul sahi hain, aur mujhe afsos hai. Designer aaj hi aapse baat karke ise theek karenge."
+          : "You're absolutely right, and I'm sorry. A designer will call you today to make this right.";
+      if (a.declineReason === "impossible_timeline") {
+        const m = monthName(f.timeline.start);
+        if (m)
+          return hi
+            ? `Bilkul. Maine aapka number note kar liya hai — hum ${m} se pehle call karke start plan karenge.`
+            : `Of course. I've noted your number, and we'll call you before ${m} to plan the start.`;
+        return hi
+          ? "Phir bhi — ek room redesign execution ke saath kam se kam 8–10 hafte leta hai. Hum ise rush nahi karna chahenge."
+          : "Even so — a room redesign with execution takes at least 8–10 weeks from start to finish. We wouldn't want to rush it.";
+      }
       if (a.declineReason)
         return hi
           ? "Bilkul samajh sakti hoon. Jab bhi aapka plan badle, humein zaroor call kijiye."

@@ -11,6 +11,8 @@ export function formatIST(iso: string): string {
   }) + " IST";
 }
 
+const day = (iso: string) => new Date(iso + "T00:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
 const PROJECT_LABEL = { full_home: "Full home", partial: "Partial home", single_room: "Single room", office: "Office" } as const;
 
 export function transcriptText(turns: Turn[]): string {
@@ -22,9 +24,9 @@ export function buildHandoffNote(e: Enquiry, f: Facts, q: Qualification, o: Outc
   const t = f.timeline;
   const c3 = q.criteria.find((c) => c.id === 3)!;
   const timelineParts = [
-    t.deadline && `Complete by ${t.deadlineEvent ?? t.deadlineRaw ?? t.deadline} (~${Math.round(weeksBetween(now, new Date(t.deadline)))} weeks)`,
+    t.deadline && `Complete by ${t.deadlineEvent ?? t.deadlineRaw ?? day(t.deadline)} (~${Math.round(weeksBetween(now, new Date(t.deadline)))} weeks)`,
     t.startRaw && `Start: ${t.startRaw}`,
-    t.siteAvailable && (t.siteAvailable <= e.receivedAt.slice(0, 10) ? "Site available now" : `Site available ~${t.siteAvailable}`),
+    t.siteAvailable && (t.siteAvailable <= e.receivedAt.slice(0, 10) ? "Site available now" : `Site available ~${day(t.siteAvailable)}`),
     t.noRush && "No rush",
   ].filter(Boolean);
 
