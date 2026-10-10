@@ -3,7 +3,7 @@
 //   npm run harness -- --all          all T01–T20 with pass/fail vs label
 //   npm run harness -- --file x.json  an Enquiry JSON ({ caller, receivedAt, status, turns })
 //   add --live to use Gemini (needs GEMINI_API_KEY)
-import "dotenv/config";
+import "@/cli/env";
 import { readFileSync } from "node:fs";
 import { calcomLink } from "@/adapters/booking/calcom";
 import { createBrain } from "@/adapters/brain";

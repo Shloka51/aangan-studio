@@ -2,7 +2,7 @@
 //   npm run chat            (rules brain, or Gemini if GEMINI_API_KEY is set)
 //   npm run chat -- --rules (force the offline rules brain)
 // Type /end to hang up and see the outcome, handoff note and actions.
-import "dotenv/config";
+import "@/cli/env";
 import { createInterface } from "node:readline/promises";
 import { calcomLink } from "@/adapters/booking/calcom";
 import { createBrain } from "@/adapters/brain";

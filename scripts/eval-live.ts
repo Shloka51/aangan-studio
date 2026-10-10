@@ -1,6 +1,6 @@
 // Runs T01–T20 through the GEMINI brain (real API calls, costs a few paise) and
 // reports label agreement, guardrail rewrites and ₹ cost. Not part of `npm test`.
-import "dotenv/config";
+import "@/cli/env";
 import { calcomLink } from "@/adapters/booking/calcom";
 import { geminiBrain } from "@/adapters/llm/gemini";
 import { findPricingViolations } from "@/core/guardrail";
