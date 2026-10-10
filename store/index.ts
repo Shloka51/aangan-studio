@@ -49,6 +49,11 @@ export interface Store {
   resolveCallbacks(callerNumber: string): Promise<number>;
   pendingCallbacks(): Promise<(CallbackRecord & { id: string | number })[]>;
   dashboardRows(sinceIso?: string): Promise<DashboardRow[]>;
+  /** Voice: remember a call's caller number as soon as the provider reports the call. */
+  noteCallStarted(callId: string, callerNumber: string | undefined, atIso: string): Promise<void>;
+  callerNumberFor(callId: string): Promise<string | undefined>;
+  /** True once an enquiry with this id has been finalised. */
+  isCompleted(enquiryId: string): Promise<boolean>;
 }
 
 /** Accepts the project URL with or without a pasted "/rest/v1/" suffix. */

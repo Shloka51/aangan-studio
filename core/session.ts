@@ -93,6 +93,12 @@ export class Session {
     return g.text;
   }
 
+  /** Records a line the channel spoke on its own (e.g. the voice platform's welcome message). */
+  noteAgentSaid(text: string): void {
+    this.state.transcript.push({ speaker: "agent", text, at: this.now().toISOString(), action: "greet" });
+    this.state.firstResponseAt ??= this.now().toISOString();
+  }
+
   /** The agent's opening line (live calls). */
   async greet(): Promise<string> {
     return this.say({ kind: "greet" });

@@ -1,67 +1,122 @@
-// The Vaani adapter drives the same core as the harness. No telephony, no network.
-import { createHmac } from "node:crypto";
-import { describe, expect, it } from "vitest";
+// The Vaani adapter drives the same core as the harness, over a real local WebSocket,
+// using a fake Vaani client. No telephony, no paid APIs, no network beyond localhost.
+import type { AddressInfo } from "node:net";
+import type { Server } from "node:http";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { calcomLink } from "@/adapters/booking/calcom";
 import { rulesBrain } from "@/adapters/brain";
 import type { Transport } from "@/adapters/handoff/telegram";
-import { handleVoiceEvent, parseVaaniEvent, verifySignature, type VoiceDeps } from "@/adapters/voice/vaani";
+import { handleVaaniEvent, newCallerText, parseVaaniEvent, vaaniGreeting } from "@/adapters/voice/vaani";
 import { PRICING_DEFLECTION } from "@/core/knowledge";
+import { findPricingViolations } from "@/core/guardrail";
+import { createVaaniServer } from "@/server/vaani-ws";
 import { MemoryStore } from "@/store/memory";
+import { fakeVaaniCall } from "./support/fake-vaani";
 import { loadFixtures } from "./support/fixtures";
 
 const quiet: Transport = { send: async () => ({ status: "sent" }) };
-const setup = (): VoiceDeps & { store: MemoryStore } => ({
-  core: { brain: rulesBrain(), bookingLink: calcomLink },
-  store: new MemoryStore(),
-  actions: { telegram: quiet, email: quiet },
+const TOKEN = "test-byol-token";
+const store = new MemoryStore();
+const finished = new Map<string, () => void>();
+const done = (callId: string) => new Promise<void>((r) => finished.set(callId, r));
+let server: Server;
+/** Replays run "as of" the original call date, so timeline maths match the transcript. */
+let clock: Date | undefined;
+let url: string;
+
+beforeAll(async () => {
+  server = createVaaniServer({
+    core: { brain: rulesBrain(), bookingLink: calcomLink },
+    store,
+    actions: { telegram: quiet, email: quiet },
+    token: TOKEN,
+    now: () => clock ?? new Date(),
+    onCallFinished: (id) => finished.get(id)?.(),
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  url = `ws://127.0.0.1:${(server.address() as AddressInfo).port}/vaani`;
 });
-const ev = (body: Record<string, unknown>) => parseVaaniEvent({ timestamp: "2026-09-16T12:19:00+05:30", from: "+91 98220 11313", ...body });
+afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
-describe("Vaani voice adapter", () => {
-  it("T13 over the webhook: greets, deflects pricing, books, hands off", async () => {
-    const d = setup();
+describe("Vaani protocol helpers", () => {
+  it("takes only what the caller said since our last reply, dropping Vaani's duplicate lines", () => {
+    expect(
+      newCallerText([
+        { role: "system", content: "x" },
+        { role: "assistant", content: "Hello" },
+        { role: "user", content: "What is this call regarding?" },
+        { role: "user", content: "What is this call regarding?" },
+      ]),
+    ).toBe("What is this call regarding?");
+    expect(newCallerText([{ role: "assistant", content: "A" }, { role: "user", content: "one" }, { role: "assistant", content: "B" }, { role: "user", content: "two" }])).toBe("two");
+    expect(vaaniGreeting([{ role: "system", content: "x" }, { role: "assistant", content: "Namaste!" }, { role: "user", content: "hi" }])).toBe("Namaste!");
+  });
+
+  it("parses Vaani's documented webhook payloads", () => {
+    expect(parseVaaniEvent({ event: "call_started", room_name: "r1", status: "dialing", phone_number: "+911234567890" })).toEqual({ kind: "started", callId: "r1", callerNumber: "+911234567890" });
+    expect(parseVaaniEvent({ event: "call_ended", room_name: "r1", call_duration: 42.5, end_reason: "AGENT_REQUESTED_DISCONNECT" })).toMatchObject({ kind: "ended", durationSec: 42.5 });
+    expect(parseVaaniEvent({ event: "call_postprocessing", call_id: "r1", data: { room_name: "r1" } })).toMatchObject({ kind: "postprocessed", callId: "r1" });
+  });
+});
+
+describe("Vaani call server (BYOL WebSocket)", () => {
+  it("refuses connections without the bearer token", async () => {
+    await expect(fakeVaaniCall({ url, callId: "no-auth", callerLines: ["hi"] })).rejects.toThrow(/401/);
+  });
+
+  it("T13 over the wire: handshake, exact deflection twice, booked, caller number from call_started", async () => {
     const t13 = loadFixtures().find((f) => f.id === "T13")!;
-    const start = await handleVoiceEvent(ev({ event: "call.started", call_id: "c1" }), d);
-    expect(start.reply).toMatch(/Aangan Studio/);
-    const replies: string[] = [];
-    for (const t of t13.turns.filter((t) => t.speaker === "caller")) replies.push((await handleVoiceEvent(ev({ event: "call.turn", call_id: "c1", text: t.text }), d)).reply!);
-    expect(replies[0]).toBe(PRICING_DEFLECTION);
-    expect(replies[1]).toBe(PRICING_DEFLECTION);
-    await handleVoiceEvent(ev({ event: "call.ended", call_id: "c1", reason: "caller_hangup" }), d);
-    const [row] = await d.store.dashboardRows();
-    expect(row).toMatchObject({ outcome: "QUALIFIED", booked: true, channel: "phone", callerNumber: "+91 98220 11313" });
-    expect(d.store.handoffs.some((h) => h.kind === "designer")).toBe(true);
+    await handleVaaniEvent(parseVaaniEvent({ event: "call_started", room_name: "call-T13", phone_number: "+919822011313" }), { core: { brain: rulesBrain(), bookingLink: calcomLink }, store });
+    const finishedT13 = done("call-T13");
+    const r = await fakeVaaniCall({ url, callId: "call-T13", token: TOKEN, callerLines: t13.turns.filter((t) => t.speaker === "caller").map((t) => t.text) });
+    await finishedT13;
+
+    expect(r.handshake.map((f) => f.interaction_type)).toEqual(["config", "greeting"]);
+    expect(r.replies[0]).toBe(PRICING_DEFLECTION);
+    expect(r.replies[1]).toBe(PRICING_DEFLECTION);
+    const result = store.results.get("call-T13")!;
+    expect(result.outcome.kind).toBe("QUALIFIED");
+    expect(result.enquiry.caller.number).toBe("+919822011313");
+    expect(result.transcript[0]).toMatchObject({ speaker: "agent", action: "greet" }); // Vaani's own welcome line
+    expect(store.bookings.some((b) => b.enquiryId === "call-T13")).toBe(true);
   });
 
-  it("a dropped call before any outcome queues a callback (T17 first call)", async () => {
-    const d = setup();
-    await handleVoiceEvent(ev({ event: "call.started", call_id: "c2" }), d);
-    await handleVoiceEvent(ev({ event: "call.turn", call_id: "c2", text: "Hi, I wanted to inquire about —" }), d);
-    await handleVoiceEvent(ev({ event: "call.ended", call_id: "c2", reason: "network_drop" }), d);
-    expect((await d.store.dashboardRows())[0].outcome).toBe("CALLBACK");
-    expect(await d.store.pendingCallbacks()).toHaveLength(1);
+  it("every September call gets its labelled outcome through the voice path, and no reply carries a price", async () => {
+    for (const f of loadFixtures().filter((x) => x.status === "answered")) {
+      const callId = `call-${f.id}-replay`;
+      clock = new Date(f.receivedAt);
+      const finishedCall = done(callId);
+      const r = await fakeVaaniCall({ url, callId, token: TOKEN, callerLines: f.turns.filter((t) => t.speaker === "caller").map((t) => t.text) });
+      await finishedCall;
+      for (const reply of r.replies) expect(findPricingViolations(reply), `${f.id}: ${reply}`).toEqual([]);
+      const result = store.results.get(callId)!;
+      expect(result.outcome.kind, f.id).toBe(f.expected.outcome);
+      if (f.expected.declineReason) expect(result.outcome.declineReason, f.id).toBe(f.expected.declineReason);
+    }
+    clock = undefined;
+  }, 60000);
+
+  it("a call where the caller never speaks becomes a callback", async () => {
+    await handleVaaniEvent(parseVaaniEvent({ event: "call_started", room_name: "silent-1", phone_number: "+919000000001" }), { core: { brain: rulesBrain(), bookingLink: calcomLink }, store });
+    const finishedSilent = done("silent-1");
+    await fakeVaaniCall({ url, callId: "silent-1", token: TOKEN, callerLines: [] });
+    await finishedSilent;
+    expect(store.results.get("silent-1")!.outcome.kind).toBe("CALLBACK");
+    expect((await store.pendingCallbacks()).some((c) => c.callerNumber === "+919000000001")).toBe(true);
+  });
+});
+
+describe("Vaani webhooks (safety net)", () => {
+  it("if the call server never handled a call, post-processing logs it as missed and queues a callback (T08)", async () => {
+    const deps = { core: { brain: rulesBrain(), bookingLink: calcomLink }, store, actions: { telegram: quiet, email: quiet } };
+    await handleVaaniEvent(parseVaaniEvent({ event: "call_started", room_name: "orphan-1", phone_number: "+919000000002" }), deps);
+    const res = await handleVaaniEvent(parseVaaniEvent({ event: "call_postprocessing", call_id: "orphan-1", data: { room_name: "orphan-1" } }), deps);
+    expect(res.action).toBe("queued_callback");
+    expect(store.results.get("orphan-1")!.outcome.kind).toBe("CALLBACK");
   });
 
-  it("a missed call (T08) is logged with a callback", async () => {
-    const d = setup();
-    await handleVoiceEvent(ev({ event: "call.missed", call_id: "c3", timestamp: "2026-09-09T22:47:00+05:30" }), d);
-    const [row] = await d.store.dashboardRows();
-    expect(row).toMatchObject({ outcome: "CALLBACK", afterHours: true });
-    expect(row.firstResponseAt).toBeUndefined();
-  });
-
-  it("turns after the call has ended are ignored", async () => {
-    const d = setup();
-    await handleVoiceEvent(ev({ event: "call.started", call_id: "c4" }), d);
-    await handleVoiceEvent(ev({ event: "call.ended", call_id: "c4" }), d);
-    expect(await handleVoiceEvent(ev({ event: "call.turn", call_id: "c4", text: "hello?" }), d)).toEqual({ reply: "", end_call: true });
-  });
-
-  it("verifies HMAC signatures", () => {
-    const body = '{"event":"call.started","call_id":"x"}';
-    const sig = createHmac("sha256", "s3cret").update(body).digest("hex");
-    expect(verifySignature(body, sig, "s3cret")).toBe(true);
-    expect(verifySignature(body, "00" + sig.slice(2), "s3cret")).toBe(false);
-    expect(verifySignature(body, null, "s3cret")).toBe(false);
+  it("does not double-log a call the server already finalised", async () => {
+    const deps = { core: { brain: rulesBrain(), bookingLink: calcomLink }, store };
+    expect((await handleVaaniEvent(parseVaaniEvent({ event: "call_postprocessing", call_id: "call-T13" }), deps)).action).toBe("already_handled");
   });
 });

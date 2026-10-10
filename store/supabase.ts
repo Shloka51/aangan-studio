@@ -23,7 +23,7 @@ export class SupabaseStore implements Store {
         external_id: e.externalId ?? null,
         channel: e.channel,
         caller_name: s.facts.callerName ?? e.caller.name ?? null,
-        caller_number: e.caller.number ?? null,
+        ...(e.caller.number ? { caller_number: e.caller.number } : {}),
         received_at: e.receivedAt,
         first_response_at: s.firstResponseAt ?? null,
         contact_status: e.status,
@@ -48,7 +48,7 @@ export class SupabaseStore implements Store {
         external_id: e.externalId ?? null,
         channel: e.channel,
         caller_name: r.facts.callerName ?? e.caller.name ?? null,
-        caller_number: e.caller.number ?? null,
+        ...(e.caller.number ? { caller_number: e.caller.number } : {}),
         received_at: e.receivedAt,
         first_response_at: r.firstResponseAt ?? null,
         ended_at: new Date().toISOString(),
@@ -113,6 +113,28 @@ export class SupabaseStore implements Store {
   async pendingCallbacks() {
     const data = check(await this.db.from("callbacks").select("*").eq("status", "pending").order("due_by"), "pending callbacks");
     return (data ?? []).map((c) => ({ id: c.id, enquiryId: c.enquiry_id, callerNumber: c.caller_number, kind: c.kind, reason: c.reason, dueBy: c.due_by }));
+  }
+
+  async noteCallStarted(callId: string, callerNumber: string | undefined, atIso: string) {
+    const existing = check(await this.db.from("enquiries").select("id").eq("id", callId).maybeSingle(), "find call");
+    if (existing) {
+      if (callerNumber) check(await this.db.from("enquiries").update({ caller_number: callerNumber }).eq("id", callId), "note caller");
+      return;
+    }
+    check(
+      await this.db.from("enquiries").insert({ id: callId, external_id: callId, channel: "phone", contact_status: "answered", received_at: atIso, caller_number: callerNumber ?? null }),
+      "note call started",
+    );
+  }
+
+  async callerNumberFor(callId: string) {
+    const data = check(await this.db.from("enquiries").select("caller_number").eq("id", callId).maybeSingle(), "caller number");
+    return (data?.caller_number as string | null) ?? undefined;
+  }
+
+  async isCompleted(enquiryId: string) {
+    const data = check(await this.db.from("enquiries").select("state").eq("id", enquiryId).maybeSingle(), "is completed");
+    return data?.state === "completed";
   }
 
   async dashboardRows(sinceIso?: string): Promise<DashboardRow[]> {

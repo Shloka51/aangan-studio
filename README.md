@@ -10,8 +10,9 @@ This agent answers Aangan Studio's inbound phone enquiries 24/7. It qualifies ea
 The agent never quotes a price.
 
 ```
-phone (Vaani: STT/TTS, Hindi + English)
-        │  webhook per caller utterance
+phone ─► Vaani (vaanivoice.ai: telephony, STT/TTS, Hindi + English)
+        │  BYOL WebSocket, one per call ──► server/vaani-ws.ts (always-on call server)
+        │  call-event webhooks ───────────► Vercel /api/voice/vaani (caller number, missed-call safety net)
         ▼
 adapters/voice/vaani.ts ──► core/ (channel-agnostic) ──► adapters/actions.ts
                               load context                 ├─ handoff: Telegram (primary) + Resend email
@@ -29,7 +30,8 @@ The **brain is separate from the channel.** `core/` takes a normalized `Enquiry`
 ## Live deployment
 
 - Dashboard: https://aangan-studio-five.vercel.app (basic auth; password is `DASHBOARD_PASSWORD`)
-- Vaani webhook: `https://aangan-studio-five.vercel.app/api/voice/vaani` (HMAC-signed with `VAANI_WEBHOOK_SECRET`)
+- Vaani call-event webhook: `https://aangan-studio-five.vercel.app/api/voice/vaani?token=<VAANI_WEBHOOK_SECRET>`
+- Vaani call server (BYOL WebSocket): `npm run voice-server`. This needs an always-on host or a tunnel; see step 7 below.
 - Every push to `main` auto-deploys (Vercel project `aangan-studio`, region `bom1`).
 
 ## Quick start (no keys needed)
@@ -60,7 +62,7 @@ npm run dev
 
 Each command:
 
-- `npm test` runs 86 tests: T01–T20, the guardrail, Hinglish, actions, voice and metrics.
+- `npm test` runs 94 tests: T01–T20, the guardrail, Hinglish, actions, voice and metrics.
 - `npm run harness -- --all` replays every transcript and shows its outcome against its label.
 - `npm run harness -- T13` shows one call in full: generated conversation, criteria, outcome, handoff note and actions.
 - `npm run chat -- --rules` lets you be the caller in your terminal. Drop `--rules` to use Gemini once a key is set.
@@ -101,7 +103,19 @@ Judgement calls I made where the files leave room:
 4. **Telegram.** Create a bot with @BotFather and set `TELEGRAM_BOT_TOKEN`. Add the bot to the designers' group and set `TELEGRAM_DESIGNER_CHAT_ID`. Optionally set `TELEGRAM_STUDIO_HEAD_CHAT_ID` for escalations; otherwise escalations go to the designer chat.
 5. **Resend.** Set `RESEND_API_KEY`, `HANDOFF_EMAIL_TO` and `STUDIO_HEAD_EMAIL`. You need a verified sending domain for `HANDOFF_EMAIL_FROM`; otherwise Resend only delivers to your own address.
 6. **Cal.com.** Set `CALCOM_BOOKING_URL` to the consultation event page. Links are prefilled with name, phone and notes. On the event's **Booking form**, set Confirmation to **Phone**. This makes the built-in `attendeePhoneNumber` question required, and links prefill it.
-7. **Vaani.** Point the agent's webhook at `https://<deploy>/api/voice/vaani` and set `VAANI_WEBHOOK_SECRET`. In production, unsigned requests are rejected.
+7. **Vaani** (vaanivoice.ai; protocol from docs.vaanivoice.ai, *Bring Your Own LLM* and *Webhook Setup*):
+   - **Call server.** Vaani's BYOL holds a WebSocket open for the whole call, and Vercel can't host that, so `server/vaani-ws.ts` runs separately.
+     - **To test for free:** run `npm run voice-server` on your Mac and expose port 8787 with a tunnel (`cloudflared tunnel --url http://localhost:8787` or `ngrok http 8787`).
+     - **For production:** deploy the included `Dockerfile` to an always-on host. Fly.io Mumbai costs about $2–5/month.
+   - **Vaani agent → Brain → Reasoning LLM → Bring your Own LLM:**
+     - URL: `wss://<call-server-host>/vaani`. Vaani appends `/<call_id>` itself.
+     - Auth Token: your `VAANI_BYOL_TOKEN`.
+     - **Fallback: "No fallback"**, so Vaani's own LLM can never answer around the pricing guardrail.
+   - **Vaani agent → Welcome message:** `Hello, Aangan Studio. How can I help you today?` Vaani speaks this before our server is called, and it's recorded as the first agent turn.
+   - **Vaani → Settings → Webhooks:** `https://<vercel-app>/api/voice/vaani?token=<VAANI_WEBHOOK_SECRET>`.
+     - `call_started` gives us the caller's number.
+     - `call_postprocessing` acts as a safety net: if the call server never handled a call, it's logged as missed and a callback is queued, like T08.
+   - **Phone number** (Vaani → Telephony): Vobiz numbers cost about ₹100 setup plus ₹500–999/month. Without one, you can test with Vaani's in-browser calls.
 8. **Dashboard.** Set `DASHBOARD_PASSWORD`; the page is behind basic auth. In production it refuses to serve without a password.
 9. **Deploy.** Push to GitHub and import the repo in Vercel. Every push to `main` auto-deploys. `vercel.json` pins the functions to Mumbai (`bom1`) for latency.
 
@@ -111,14 +125,17 @@ Judgement calls I made where the files leave room:
 |---|---|
 | Core: qualification, policy, guardrail, handoff note, outcomes | **Live**, and fully tested offline |
 | Rules brain (regex NLU + studio-wording templates) | **Live**. Used by tests and as the runtime fallback |
-| Gemini brain | **Built, not yet run against the real API** (needs a key). `npm run eval:live` measures it on T01–T20 |
-| Supabase store | **Built, schema ready**. Not connected until keys are set; an in-memory store is used until then |
-| Telegram / Resend | **Built**. Stubs to console without credentials. Tested with mocked `fetch` |
+| Gemini brain (`gemini-3.5-flash-lite`) | **Live.** On T01–T20: 21 of 21 correct, ₹0.38 per call, about 2.7 s per reply. Falls back to rules on timeout or error |
+| Supabase store | **Live** |
+| Telegram | **Live** (Aangan Leads group) |
+| Resend email | **Built, off.** Needs `RESEND_API_KEY` and recipient addresses; stubs to console until then |
+| Dashboard | **Live** on Vercel (basic auth), auto-deploys from GitHub |
 | Cal.com | **Link generation is live.** Picking a slot *on the call* (Cal.com API v2 bookings) is not built: the caller picks the slot from the link |
 | Sending the booking link *to the caller* | **Stub.** Phone has no channel for it yet. It needs an SMS/WhatsApp adapter, or Vaani's own SMS if it has one. The link is stored and is in the designer's note |
-| Vaani voice adapter | **Built against an assumed webhook contract** (documented at the top of `adapters/voice/vaani.ts`). Several products are called "Vaani", so the event/field names must be confirmed against your provider's docs. Only `parseVaaniEvent` / `toVaaniResponse` should need to change. Tested with simulated calls; no telephony is used in tests |
+| Vaani voice adapter | **Built to Vaani's documented protocol** (BYOL WebSocket + call-event webhooks). Tested with a fake Vaani client over a real local WebSocket: every September call gets its labelled outcome on the voice path. Also checked live: Gemini + Supabase over a WebSocket, ₹0.36 per call. **Not yet connected to Vaani itself.** That needs the call server running somewhere Vaani can reach and a Vaani agent configured (step 7). No paid voice or phone APIs are called in tests |
+| Phone number + always-on call-server hosting | **Paid, not bought.** Vobiz number: ₹100 setup + ₹500–999/month. Hosting: about $2–5/month. Vaani's in-browser calls (₹100 trial balance) work without a number |
 | Callback execution (someone actually calling back) | **Human step.** Callbacks are queued in `callbacks` and announced on Telegram. A caller ringing back resolves their pending callback automatically (T17) |
-| Abandoned sessions (no `call.ended` event) | **Not handled yet.** They would need a small cron to finalize stale `in_progress` enquiries |
+| Abandoned voice sessions | **Handled.** A WebSocket close finalises the call. If the call server was unreachable, Vaani's `call_postprocessing` webhook logs a missed call and queues a callback |
 
 ## Layout
 
@@ -126,9 +143,10 @@ Judgement calls I made where the files leave room:
 knowledge/        services.md, qualified.md, pricing.md (internal), transcripts PDF + extracted text
 core/             types, session pipeline, nlu, policy, qualify, guardrail, nlg, prompt, handoff, timeline
 adapters/         brain.ts, llm/gemini.ts, voice/vaani.ts, handoff/{telegram,email}.ts, booking/calcom.ts, actions.ts
+server/           vaani-ws.ts: always-on BYOL WebSocket call server (`npm run voice-server`, Dockerfile)
 store/            Store port, memory + Supabase implementations
 dashboard/        metrics (pure) + data loading
-app/              Next.js: dashboard page, /api/voice/vaani
+app/              Next.js: dashboard page, /api/voice/vaani (Vaani call-event webhook)
 cli/              harness.ts (transcripts), chat.ts (interactive)
 tests/            fixtures/transcripts.json (generated by scripts/build-fixtures.ts) + suites
 ```

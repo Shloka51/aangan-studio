@@ -9,6 +9,18 @@ export class MemoryStore implements Store {
   handoffs: HandoffRecord[] = [];
   bookings: { enquiryId: string; url: string }[] = [];
   callbacks: (CallbackRecord & { id: number; status: "pending" | "done" | "resolved_by_caller" })[] = [];
+  calls = new Map<string, { callerNumber?: string; startedAt: string }>();
+
+  async noteCallStarted(callId: string, callerNumber: string | undefined, atIso: string) {
+    const prev = this.calls.get(callId);
+    this.calls.set(callId, { callerNumber: callerNumber ?? prev?.callerNumber, startedAt: prev?.startedAt ?? atIso });
+  }
+  async callerNumberFor(callId: string) {
+    return this.calls.get(callId)?.callerNumber ?? this.sessions.get(callId)?.enquiry.caller.number;
+  }
+  async isCompleted(enquiryId: string) {
+    return this.results.has(enquiryId);
+  }
 
   async saveSession(s: SessionState) {
     this.sessions.set(s.enquiry.id, structuredClone(s));
