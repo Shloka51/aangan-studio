@@ -70,7 +70,7 @@ const TERMINAL = new Set(["confirm_booking", "decline", "offer_deferred_start", 
 export class VaaniCall {
   private session?: Session;
   private queue: Promise<unknown> = Promise.resolve();
-  private finalized?: Promise<EnquiryResult>;
+  private finalized?: Promise<EnquiryResult | undefined>;
 
   constructor(
     readonly callId: string,
@@ -122,10 +122,16 @@ export class VaaniCall {
     return [{ response_type: "response", response_id: responseId, content: turn.reply, content_complete: true, ...(endCall ? { end_call: true } : {}) }];
   }
 
-  /** Call over (WebSocket closed): classify, store, hand off. Safe to call more than once. */
-  onClose(): Promise<EnquiryResult> {
+  /**
+   * Call over (WebSocket closed): classify, store, hand off. Safe to call more than once.
+   * A connection that never carried a caller turn (Vaani's "Test Connection", or a caller
+   * who said nothing) is not finalised here: Vaani's call_postprocessing webhook logs
+   * real silent calls as missed and queues the callback.
+   */
+  onClose(): Promise<EnquiryResult | undefined> {
     this.finalized ??= this.queue.then(async () => {
-      const session = await this.ensureSession();
+      if (!this.session) return undefined;
+      const session = this.session;
       const e = session.state.enquiry;
       e.caller.number ??= await this.deps.store.callerNumberFor(this.callId).catch(() => undefined);
       if (!session.state.transcript.some((t) => t.speaker === "caller")) e.status = "dropped";

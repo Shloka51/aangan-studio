@@ -8,4 +8,4 @@ COPY . .
 RUN npx tsx scripts/build-knowledge.ts
 ENV NODE_ENV=production PORT=8080
 EXPOSE 8080
-CMD ["npx", "tsx", "server/vaani-ws.ts"]
+CMD ["npx", "tsx", "server/main.ts"]

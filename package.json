@@ -15,7 +15,7 @@
     "knowledge": "tsx scripts/build-knowledge.ts",
     "prebuild": "npm run knowledge",
     "pretest": "npm run knowledge",
-    "voice-server": "tsx server/vaani-ws.ts"
+    "voice-server": "tsx server/main.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

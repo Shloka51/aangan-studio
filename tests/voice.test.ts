@@ -60,8 +60,24 @@ describe("Vaani protocol helpers", () => {
 });
 
 describe("Vaani call server (BYOL WebSocket)", () => {
-  it("refuses connections without the bearer token", async () => {
+  it("refuses call connections without the bearer token", async () => {
     await expect(fakeVaaniCall({ url, callId: "no-auth", callerLines: ["hi"] })).rejects.toThrow(/401/);
+  });
+
+  it("lets Vaani's browser 'Test Connection' (bare URL, no token) see the handshake, but never runs the agent", async () => {
+    const { WebSocket } = await import("ws");
+    const frames: Record<string, unknown>[] = [];
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(url);
+      ws.on("message", (m) => {
+        frames.push(JSON.parse(m.toString()));
+        if (frames.length === 2) ws.send(JSON.stringify({ interaction_type: "response_required", response_id: 1, transcript: [{ role: "user", content: "how much per sq ft?" }] }));
+      });
+      ws.on("close", () => resolve());
+      ws.on("error", reject);
+    });
+    expect(frames.map((f) => f.interaction_type)).toEqual(["config", "greeting"]);
+    expect(frames.some((f) => f.response_type === "response")).toBe(false);
   });
 
   it("T13 over the wire: handshake, exact deflection twice, booked, caller number from call_started", async () => {
@@ -96,11 +112,20 @@ describe("Vaani call server (BYOL WebSocket)", () => {
     clock = undefined;
   }, 60000);
 
-  it("a call where the caller never speaks becomes a callback", async () => {
-    await handleVaaniEvent(parseVaaniEvent({ event: "call_started", room_name: "silent-1", phone_number: "+919000000001" }), { core: { brain: rulesBrain(), bookingLink: calcomLink }, store });
+  it("a connection with no caller turn (Vaani's Test Connection) is not logged as a call", async () => {
+    const finishedProbe = done("probe-1");
+    await fakeVaaniCall({ url, callId: "probe-1", token: TOKEN, callerLines: [] });
+    await finishedProbe;
+    expect(store.results.has("probe-1")).toBe(false);
+  });
+
+  it("a silent call is then caught by the post-call webhook and becomes a callback", async () => {
+    const deps = { core: { brain: rulesBrain(), bookingLink: calcomLink }, store, actions: { telegram: quiet, email: quiet } };
+    await handleVaaniEvent(parseVaaniEvent({ event: "call_started", room_name: "silent-1", phone_number: "+919000000001" }), deps);
     const finishedSilent = done("silent-1");
     await fakeVaaniCall({ url, callId: "silent-1", token: TOKEN, callerLines: [] });
     await finishedSilent;
+    await handleVaaniEvent(parseVaaniEvent({ event: "call_postprocessing", call_id: "silent-1" }), deps);
     expect(store.results.get("silent-1")!.outcome.kind).toBe("CALLBACK");
     expect((await store.pendingCallbacks()).some((c) => c.callerNumber === "+919000000001")).toBe(true);
   });

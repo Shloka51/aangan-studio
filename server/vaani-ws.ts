@@ -29,18 +29,31 @@ function tokenOk(req: IncomingMessage, token?: string): boolean {
 export function createVaaniServer(opts: VaaniServerOptions): Server {
   const wss = new WebSocketServer({ noServer: true });
   const server = createServer((req, res) => {
+    if (req.url !== "/health") console.log(`[vaani] http ${req.method} ${req.url} ua=${(req.headers["user-agent"] ?? "-").slice(0, 40)}`);
     if (req.url === "/health") return res.writeHead(200, { "content-type": "text/plain" }).end("ok");
     res.writeHead(404).end();
   });
 
   server.on("upgrade", (req, socket, head) => {
-    const m = (req.url ?? "").split("?")[0].match(/^\/vaani\/([^/]+)\/?$/);
+    console.log(`[vaani] upgrade ${req.url} auth=${req.headers.authorization ? "bearer" : "none"} ua=${(req.headers["user-agent"] ?? "-").slice(0, 40)}`);
+    // Vaani appends /<call_id>; its "Test Connection" may hit the bare /vaani URL.
+    const m = (req.url ?? "").split("?")[0].match(/^\/vaani(?:\/([^/]+))?\/?$/);
     if (!m) return socket.destroy();
+    // Vaani's dashboard "Test Connection" runs in the browser, which can't send an
+    // Authorization header, and it uses the bare /vaani URL. Let it see the handshake,
+    // then close. It can't drive the agent: frames on a probe are ignored.
+    if (!m[1] && !tokenOk(req, opts.token)) {
+      return wss.handleUpgrade(req, socket, head, (ws) => {
+        handshakeFrames().forEach((f) => ws.send(JSON.stringify(f)));
+        console.log("[vaani] connection test (no call id): handshake sent, closing");
+        setTimeout(() => ws.close(), 3000);
+      });
+    }
     if (!tokenOk(req, opts.token)) {
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       return socket.destroy();
     }
-    wss.handleUpgrade(req, socket, head, (ws) => onCall(ws, decodeURIComponent(m[1])));
+    wss.handleUpgrade(req, socket, head, (ws) => onCall(ws, m[1] ? decodeURIComponent(m[1]) : `probe-${Date.now()}`));
   });
 
   function onCall(ws: WebSocket, callId: string) {
@@ -68,7 +81,7 @@ export function createVaaniServer(opts: VaaniServerOptions): Server {
     ws.on("close", async () => {
       try {
         const r = await call.onClose();
-        console.log(`[vaani] call ${callId} ended → ${r.outcome.kind}`);
+        console.log(`[vaani] call ${callId} closed → ${r ? r.outcome.kind : "no caller turns (connection test or silent call; webhook will log it)"}`);
       } catch (err) {
         console.error(`[vaani] ${callId} finalize failed:`, (err as Error).message);
       } finally {
@@ -78,23 +91,4 @@ export function createVaaniServer(opts: VaaniServerOptions): Server {
   }
 
   return server;
-}
-
-// ---- CLI entry: `npm run voice-server` -----------------------------------------------
-if (import.meta.url === `file://${process.argv[1]}`) {
-  (async () => {
-    await import("@/cli/env");
-    const { createBrain } = await import("@/adapters/brain");
-    const { calcomLink } = await import("@/adapters/booking/calcom");
-    const { getStore } = await import("@/store");
-    const port = Number(process.env.PORT ?? 8787);
-    const server = createVaaniServer({
-      core: { brain: await createBrain(), bookingLink: calcomLink },
-      store: await getStore(),
-      token: process.env.VAANI_BYOL_TOKEN?.trim() || undefined,
-    });
-    server.listen(port, () =>
-      console.log(`Vaani call server on :${port} — brain: ${process.env.GEMINI_API_KEY ? "gemini" : "rules"}, store: ${process.env.SUPABASE_URL ? "supabase" : "memory"}, auth: ${process.env.VAANI_BYOL_TOKEN ? "bearer token" : "OFF (dev only)"}`),
-    );
-  })();
 }
